@@ -1,4 +1,5 @@
 const mysql = require('mysql2/promise');
+const { createTables, seedData } = require('./schema');
 
 const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
@@ -28,14 +29,8 @@ async function initDB() {
         queueLimit: 0
     });
 
-    // Tabela temporară din aplicația de start; va fi înlocuită în KAN-10.
-    await pool.execute(`
-        CREATE TABLE IF NOT EXISTS echipamente (
-            id INT PRIMARY KEY,
-            nume VARCHAR(100) NOT NULL,
-            tip VARCHAR(50)
-        )
-    `);
+    await createTables(pool);
+    await seedData(pool);
 }
 
 function getPool() {

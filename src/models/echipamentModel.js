@@ -1,28 +1,40 @@
 const { getPool } = require('../config/db');
 
-// Modelul conține DOAR interogările SQL. Nu știe nimic despre req/res.
+// Modelul pentru tabela echipamente. Doar interogări SQL.
+// MySQL întoarce BOOLEAN ca 0/1, așa că îl transformăm în true/false.
+function toEchipament(row) {
+    return { ...row, este_special: Boolean(row.este_special) };
+}
 
-async function findAll() {
-    const [rows] = await getPool().execute('SELECT * FROM echipamente');
-    return rows;
+async function findAll({ laboratorId } = {}) {
+    let sql = 'SELECT * FROM echipamente';
+    const params = [];
+    if (laboratorId) {
+        sql += ' WHERE laborator_id = ?';
+        params.push(laboratorId);
+    }
+    const [rows] = await getPool().execute(sql + ' ORDER BY id', params);
+    return rows.map(toEchipament);
 }
 
 async function findById(id) {
     const [rows] = await getPool().execute('SELECT * FROM echipamente WHERE id = ?', [id]);
-    return rows[0] || null;
+    return rows[0] ? toEchipament(rows[0]) : null;
 }
 
-async function create({ id, nume, tip }) {
-    await getPool().execute(
-        'INSERT INTO echipamente (id, nume, tip) VALUES (?, ?, ?)',
-        [id, nume, tip ?? null]
-    );
-}
-
-async function update(id, { nume, tip }) {
+// Întoarce id-ul generat automat de MySQL (AUTO_INCREMENT)
+async function create({ laborator_id, nume, tip, cantitate, este_special }) {
     const [result] = await getPool().execute(
-        'UPDATE echipamente SET nume = ?, tip = ? WHERE id = ?',
-        [nume, tip ?? null, id]
+        'INSERT INTO echipamente (laborator_id, nume, tip, cantitate, este_special) VALUES (?, ?, ?, ?, ?)',
+        [laborator_id, nume, tip, cantitate, este_special]
+    );
+    return result.insertId;
+}
+
+async function update(id, { laborator_id, nume, tip, cantitate, este_special }) {
+    const [result] = await getPool().execute(
+        'UPDATE echipamente SET laborator_id = ?, nume = ?, tip = ?, cantitate = ?, este_special = ? WHERE id = ?',
+        [laborator_id, nume, tip, cantitate, este_special, id]
     );
     return result.affectedRows > 0;
 }
