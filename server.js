@@ -1,15 +1,20 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
-const jwt = require('jsonwebtoken'); // Adăugat pentru KAN-2
-const bcrypt = require('bcrypt');    // Adăugat pentru KAN-2
+const jwt = require('jsonwebtoken'); 
+const bcrypt = require('bcrypt');    
+
+// Încărcăm variabilele de mediu (modificarea venită de la colegul tău)
+try {
+    process.loadEnvFile();
+} catch {
+    console.warn('Fișierul .env nu a fost găsit - se folosesc valorile implicite.');
+}
 
 const app = express();
 app.use(express.json());
 
-// Cheia secretă pentru generarea token-urilor (KAN-2)
 const SECRET_KEY = "cheie_secreta_pentru_jwt_schimba_in_productie"; 
 
-// Configurarea de bază
 const dbConfig = {
     host: 'localhost',
     user: 'root',
@@ -18,15 +23,11 @@ const dbConfig = {
 
 let pool;
 
-// Funcție care creează automat baza de date și tabelele la pornirea serverului
 async function initDB() {
     try {
         const connection = await mysql.createConnection(dbConfig);
-        
-        // Creăm baza de date dacă nu există
         await connection.query("CREATE DATABASE IF NOT EXISTS laborator_db");
         
-        // Configurăm pool-ul final legat de baza de date
         pool = mysql.createPool({
             ...dbConfig,
             database: 'laborator_db',
@@ -35,7 +36,6 @@ async function initDB() {
             queueLimit: 0
         });
 
-        // 1. Tabela Echipamente (existentă)
         const createEchipamenteSql = `
             CREATE TABLE IF NOT EXISTS echipamente (
                 id INT PRIMARY KEY,
@@ -45,7 +45,6 @@ async function initDB() {
         `;
         await pool.execute(createEchipamenteSql);
 
-        // 2. Tabela Utilizatori (Pentru KAN-2 Autentificare și KAN-3 Roluri)
         const createUsersSql = `
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -56,7 +55,6 @@ async function initDB() {
         `;
         await pool.execute(createUsersSql);
 
-        // 3. Tabela Rezervari (Pentru KAN-18 și restul operațiilor pe cereri)
         const createRezervariSql = `
             CREATE TABLE IF NOT EXISTS rezervari (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -74,7 +72,6 @@ async function initDB() {
 
         console.log("Baza de date și tabelele au fost inițializate cu succes!");
         
-        // Creăm un cont de admin default dacă nu există
         const [admins] = await pool.execute("SELECT * FROM users WHERE email = 'admin@usv.ro'");
         if (admins.length === 0) {
             const hashedPw = await bcrypt.hash('admin123', 10);
@@ -82,7 +79,6 @@ async function initDB() {
             console.log("Cont de admin de test creat: admin@usv.ro / admin123");
         }
 
-        // Creăm un cont de student default pentru teste
         const [students] = await pool.execute("SELECT * FROM users WHERE email = 'student@usv.ro'");
         if (students.length === 0) {
             const hashedPw = await bcrypt.hash('student123', 10);
@@ -92,7 +88,8 @@ async function initDB() {
 
         connection.destroy();
     } catch (err) {
-        console.error("Eroare la inițializarea bazei de date:", err.message);
+        console.error('Nu s-a putut conecta la baza de date:', err.message);
+        process.exit(1);
     }
 }
 
@@ -107,7 +104,6 @@ app.post('/api/login', async (req, res) => {
     try {
         const { email, parola } = req.body;
         
-        // 1. Căutăm utilizatorul în baza de date
         const [users] = await pool.execute("SELECT * FROM users WHERE email = ?", [email]);
         if (users.length === 0) {
             return res.status(401).json({ message: 'Email sau parolă incorectă.' });
@@ -115,17 +111,15 @@ app.post('/api/login', async (req, res) => {
         
         const user = users[0];
         
-        // 2. Verificăm dacă parola introdusă se potrivește cu cea criptată din baza de date
         const validPassword = await bcrypt.compare(parola, user.parola);
         if (!validPassword) {
             return res.status(401).json({ message: 'Email sau parolă incorectă.' });
         }
         
-        // 3. Generăm token-ul JWT (returnarea unui token JWT confom KAN-2)
         const token = jwt.sign(
             { id: user.id, rol: user.rol, email: user.email }, 
             SECRET_KEY, 
-            { expiresIn: '2h' } // Token valabil 2 ore
+            { expiresIn: '2h' }
         );
         
         res.status(200).json({ 
@@ -141,14 +135,13 @@ app.post('/api/login', async (req, res) => {
 
 
 // ==========================================
-// OPERAȚII CRUD ECHIPAMENTE (Inițiale)
+// OPERAȚII CRUD ECHIPAMENTE
 // ==========================================
 
 app.post('/api/echipamente', async (req, res) => {
     try {
         const { id, nume, tip } = req.body;
-        const sql = `INSERT INTO echipamente (id, nume, tip) VALUES (?, ?, ?)`;
-        await pool.execute(sql, [id, nume, tip]);
+        await pool.execute(`INSERT INTO echipamente (id, nume, tip) VALUES (?, ?, ?)`, [id, nume, tip]);
         res.status(201).json({ message: 'Echipament adăugat cu succes!' });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -157,8 +150,7 @@ app.post('/api/echipamente', async (req, res) => {
 
 app.get('/api/echipamente', async (req, res) => {
     try {
-        const sql = `SELECT * FROM echipamente`;
-        const [rows] = await pool.execute(sql);
+        const [rows] = await pool.execute(`SELECT * FROM echipamente`);
         res.status(200).json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -167,10 +159,7 @@ app.get('/api/echipamente', async (req, res) => {
 
 app.put('/api/echipamente/:id', async (req, res) => {
     try {
-        const id = req.params.id;
-        const { nume, tip } = req.body;
-        const sql = `UPDATE echipamente SET nume = ?, tip = ? WHERE id = ?`;
-        const [result] = await pool.execute(sql, [nume, tip, id]);
+        const [result] = await pool.execute(`UPDATE echipamente SET nume = ?, tip = ? WHERE id = ?`, [req.body.nume, req.body.tip, req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ message: 'Echipamentul nu a fost găsit.' });
         res.status(200).json({ message: 'Echipament actualizat!' });
     } catch (err) {
@@ -180,9 +169,7 @@ app.put('/api/echipamente/:id', async (req, res) => {
 
 app.delete('/api/echipamente/:id', async (req, res) => {
     try {
-        const id = req.params.id;
-        const sql = `DELETE FROM echipamente WHERE id = ?`;
-        const [result] = await pool.execute(sql, [id]);
+        const [result] = await pool.execute(`DELETE FROM echipamente WHERE id = ?`, [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ message: 'Echipamentul nu a fost găsit.' });
         res.status(200).json({ message: 'Echipament șters!' });
     } catch (err) {
@@ -190,7 +177,8 @@ app.delete('/api/echipamente/:id', async (req, res) => {
     }
 });
 
-const PORT = 3000;
+// Pornire server
+const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, () => {
     console.log(`Serverul backend rulează pe http://localhost:${PORT}`);
 });
