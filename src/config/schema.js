@@ -1,4 +1,6 @@
 // KAN-10: Modelul de date pentru laboratoare și echipamente.
+// KAN-2: tabelele users și rezervari (mutate din server.js).
+const bcrypt = require('bcrypt');
 // Tabelele se creează automat la pornirea serverului (dacă nu există deja).
 
 const createLaboratoare = `
@@ -30,6 +32,40 @@ const createEchipamente = `
             ON DELETE CASCADE
     )
 `;
+
+// KAN-2: utilizatori și roluri (student / profesor / admin)
+const createUsers = `
+    CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        parola VARCHAR(255) NOT NULL,
+        rol ENUM('student', 'profesor', 'admin') DEFAULT 'student'
+    )
+`;
+
+// Cererile de rezervare (folosite de KAN-18 și următoarele).
+// laborator_id face legătura cu tabela laboratoare (în loc de numele laboratorului ca text).
+const createRezervari = `
+    CREATE TABLE IF NOT EXISTS rezervari (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        id_utilizator INT NOT NULL,
+        laborator_id INT NOT NULL,
+        data_rezervare DATE NOT NULL,
+        interval_orar VARCHAR(50) NOT NULL,
+        scop TEXT,
+        stare ENUM('în așteptare', 'aprobată', 'respinsă') DEFAULT 'în așteptare',
+        motiv_respingere TEXT,
+        FOREIGN KEY (id_utilizator) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (laborator_id) REFERENCES laboratoare(id) ON DELETE CASCADE
+    )
+`;
+
+// Conturi de test (parolele sunt salvate criptat cu bcrypt)
+const utilizatoriTest = [
+    ['admin@usv.ro', 'admin123', 'admin'],
+    ['profesor@usv.ro', 'profesor123', 'profesor'],
+    ['student@usv.ro', 'student123', 'student']
+];
 
 // Date de test, inserate doar dacă tabela laboratoare e goală.
 const laboratoareTest = [
@@ -68,9 +104,23 @@ async function createTables(pool) {
     await migrateOldEchipamente(pool);
     await pool.execute(createLaboratoare);
     await pool.execute(createEchipamente);
+    await pool.execute(createUsers);
+    await pool.execute(createRezervari);
+}
+
+async function seedUsers(pool) {
+    for (const [email, parola, rol] of utilizatoriTest) {
+        const [existent] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
+        if (existent.length > 0) continue;
+        const hash = await bcrypt.hash(parola, 10);
+        await pool.execute('INSERT INTO users (email, parola, rol) VALUES (?, ?, ?)', [email, hash, rol]);
+        console.log(`Cont de test creat: ${email} / ${parola} (${rol})`);
+    }
 }
 
 async function seedData(pool) {
+    await seedUsers(pool);
+
     const [[{ total }]] = await pool.query('SELECT COUNT(*) AS total FROM laboratoare');
     if (total > 0) return;
 
