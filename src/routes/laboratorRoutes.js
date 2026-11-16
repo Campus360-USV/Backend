@@ -1,12 +1,12 @@
 const express = require('express');
 const controller = require('../controllers/laboratorController');
-const { requireAuth, requireRole } = require('../middleware/auth');
+const { requireAuth, requireRole, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
 // Citire: oricine (KAN-11)
 router.get('/', controller.getAll);
-router.get('/:id', controller.getById);
+router.get('/:id', optionalAuth, controller.getById); // KAN-13: echipamentele speciale doar pentru profesor/admin
 
 // Administrare: doar admin (KAN-26)
 router.post('/', requireAuth, requireRole('admin'), controller.create);

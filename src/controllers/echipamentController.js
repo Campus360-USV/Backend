@@ -1,5 +1,6 @@
 const Echipament = require('../models/echipamentModel');
 const Laborator = require('../models/laboratorModel');
+const { poateVedeaSpeciale } = require('../middleware/auth');
 
 // Controller-ul: citește cererea, validează, apelează modelul, trimite răspunsul.
 // În Express 5, erorile aruncate din funcții async ajung automat la errorHandler.
@@ -41,7 +42,8 @@ async function getAll(req, res) {
         laboratorId = parseId(req.query.laborator_id);
         if (!laboratorId) return res.status(400).json({ error: 'laborator_id invalid.' });
     }
-    res.status(200).json(await Echipament.findAll({ laboratorId }));
+    const includeSpeciale = poateVedeaSpeciale(req);
+    res.status(200).json(await Echipament.findAll({ laboratorId, includeSpeciale }));
 }
 
 async function getById(req, res) {
@@ -49,7 +51,10 @@ async function getById(req, res) {
     if (!id) return res.status(400).json({ error: 'ID invalid.' });
 
     const echipament = await Echipament.findById(id);
-    if (!echipament) return res.status(404).json({ error: 'Echipamentul nu a fost găsit.' });
+    // Un echipament special apare ca inexistent pentru cine nu are voie să-l vadă.
+    if (!echipament || (echipament.este_special && !poateVedeaSpeciale(req))) {
+        return res.status(404).json({ error: 'Echipamentul nu a fost găsit.' });
+    }
     res.status(200).json(echipament);
 }
 

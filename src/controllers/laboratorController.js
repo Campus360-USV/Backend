@@ -1,5 +1,6 @@
 const Laborator = require('../models/laboratorModel');
 const Echipament = require('../models/echipamentModel');
+const { poateVedeaSpeciale } = require('../middleware/auth');
 
 // KAN-11: API pentru laboratoare (citire)
 // KAN-26: adăugare, editare, ștergere (doar admin)
@@ -52,7 +53,8 @@ async function getById(req, res) {
     const laborator = await Laborator.findById(id);
     if (!laborator) return res.status(404).json({ error: 'Laboratorul nu a fost găsit.' });
 
-    const echipamente = await Echipament.findAll({ laboratorId: id });
+    // KAN-13: echipamentele speciale apar doar pentru profesori și admini
+    const echipamente = await Echipament.findAll({ laboratorId: id, includeSpeciale: poateVedeaSpeciale(req) });
     res.status(200).json({ ...laborator, echipamente });
 }
 
