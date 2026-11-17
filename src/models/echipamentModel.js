@@ -6,13 +6,19 @@ function toEchipament(row) {
     return { ...row, este_special: Boolean(row.este_special) };
 }
 
-async function findAll({ laboratorId } = {}) {
-    let sql = 'SELECT * FROM echipamente';
+// includeSpeciale = false -> se întorc doar echipamentele implicite (KAN-13)
+async function findAll({ laboratorId, includeSpeciale = true } = {}) {
+    const conditii = [];
     const params = [];
     if (laboratorId) {
-        sql += ' WHERE laborator_id = ?';
+        conditii.push('laborator_id = ?');
         params.push(laboratorId);
     }
+    if (!includeSpeciale) {
+        conditii.push('este_special = FALSE');
+    }
+    let sql = 'SELECT * FROM echipamente';
+    if (conditii.length > 0) sql += ' WHERE ' + conditii.join(' AND ');
     const [rows] = await getPool().execute(sql + ' ORDER BY id', params);
     return rows.map(toEchipament);
 }
