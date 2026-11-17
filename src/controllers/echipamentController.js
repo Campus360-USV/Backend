@@ -1,13 +1,9 @@
 const Echipament = require('../models/echipamentModel');
 const Laborator = require('../models/laboratorModel');
+const { parseId } = require('../utils/validare');
 
 // Controller-ul: citește cererea, validează, apelează modelul, trimite răspunsul.
 // În Express 5, erorile aruncate din funcții async ajung automat la errorHandler.
-
-function parseId(value) {
-    const id = Number(value);
-    return Number.isInteger(id) && id > 0 ? id : null;
-}
 
 // Validează body-ul pentru POST/PUT. Întoarce { error } sau { data }.
 async function validateBody(body) {
