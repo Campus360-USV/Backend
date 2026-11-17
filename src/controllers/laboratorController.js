@@ -1,14 +1,10 @@
 const Laborator = require('../models/laboratorModel');
 const Echipament = require('../models/echipamentModel');
 const { poateVedeaSpeciale } = require('../middleware/auth');
+const { parseId } = require('../utils/validare');
 
 // KAN-11: API pentru laboratoare (citire)
 // KAN-26: adăugare, editare, ștergere (doar admin)
-
-function parseId(value) {
-    const id = Number(value);
-    return Number.isInteger(id) && id > 0 ? id : null;
-}
 
 function text(value) {
     return value === undefined || value === null ? '' : String(value).trim();
@@ -98,6 +94,14 @@ async function update(req, res) {
 async function remove(req, res) {
     const id = parseId(req.params.id);
     if (!id) return res.status(400).json({ error: 'ID invalid.' });
+
+    // Nu ștergem un laborator care are rezervări active (s-ar pierde odată cu el).
+    const rezervariActive = await Laborator.countRezervariActive(id);
+    if (rezervariActive > 0) {
+        return res.status(409).json({
+            error: `Laboratorul are ${rezervariActive} rezervări active (în așteptare sau aprobate). Anulează-le sau respinge-le înainte de ștergere.`
+        });
+    }
 
     const deleted = await Laborator.remove(id);
     if (!deleted) return res.status(404).json({ error: 'Laboratorul nu a fost găsit.' });

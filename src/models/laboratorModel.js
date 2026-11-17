@@ -36,10 +36,23 @@ async function update(id, { nume, locatie, capacitate, responsabil, reguli }) {
     return result.affectedRows > 0;
 }
 
-// Echipamentele și rezervările laboratorului se șterg automat (ON DELETE CASCADE)
+// Rezervări active = în așteptare sau aprobate, de azi încolo.
+// Un laborator cu rezervări active nu se poate șterge (vezi controller-ul).
+async function countRezervariActive(id) {
+    const [[{ total }]] = await getPool().query(
+        `SELECT COUNT(*) AS total FROM rezervari
+         WHERE laborator_id = ?
+           AND stare IN ('în așteptare', 'aprobată')
+           AND data_rezervare >= CURDATE()`,
+        [id]
+    );
+    return total;
+}
+
+// Echipamentele laboratorului (și rezervările vechi/respinse) se șterg automat (ON DELETE CASCADE)
 async function remove(id) {
     const [result] = await getPool().execute('DELETE FROM laboratoare WHERE id = ?', [id]);
     return result.affectedRows > 0;
 }
 
-module.exports = { findAll, findById, exists, create, update, remove };
+module.exports = { findAll, findById, exists, create, update, remove, countRezervariActive };
