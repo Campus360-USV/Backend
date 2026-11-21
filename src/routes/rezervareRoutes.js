@@ -10,7 +10,8 @@ router.get('/ocupate', controller.getOcupate);
 // Utilizator autentificat
 router.get('/', requireAuth, controller.getAll);
 router.get('/:id', requireAuth, controller.getById);
-router.post('/', requireAuth, controller.create);
+// Doar studenții și profesorii fac rezervări; adminul doar le aprobă/respinge
+router.post('/', requireAuth, requireRole('student', 'profesor'), controller.create);
 router.delete('/:id', requireAuth, controller.remove);
 
 // Doar admin: decizia asupra cererilor (KAN-24, KAN-25)
