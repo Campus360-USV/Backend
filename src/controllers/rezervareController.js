@@ -3,7 +3,7 @@ const Laborator = require('../models/laboratorModel');
 const { parseId } = require('../utils/validare');
 
 // Rezervări (KAN-17 calendar și prevenirea suprapunerilor, KAN-18 creare,
-// KAN-19 rezervările proprii, KAN-21 anulare).
+// KAN-19 rezervările proprii, KAN-21 anulare, KAN-24 aprobare, KAN-25 respingere cu motiv).
 
 const ORA = /^([01]\d|2[0-3]):([0-5]\d)$/;   // "08:00" ... "23:59"
 const DATA = /^\d{4}-\d{2}-\d{2}$/;           // "2026-11-20"
@@ -163,4 +163,42 @@ async function remove(req, res) {
     res.status(200).json({ message: 'Rezervarea a fost anulată.' });
 }
 
-module.exports = { getAll, getById, getOcupate, create, remove };
+// Răspunsul comun pentru aprobare / respingere
+async function trimiteDecizia(res, id, rezultat, mesaj) {
+    if (rezultat.negasita) return res.status(404).json({ error: 'Rezervarea nu a fost găsită.' });
+    if (rezultat.dejaProcesata) {
+        return res.status(409).json({ error: `Cererea a fost deja procesată (stare: ${rezultat.dejaProcesata}).` });
+    }
+    if (rezultat.conflict) {
+        const c = rezultat.conflict;
+        return res.status(409).json({
+            error: `Nu se poate aproba: există deja o rezervare aprobată în intervalul ${c.ora_inceput}-${c.ora_sfarsit}.`
+        });
+    }
+    res.status(200).json({ message: mesaj, rezervare: await Rezervare.findById(id) });
+}
+
+// PUT /api/rezervari/:id/aproba  (admin) - KAN-24
+async function aproba(req, res) {
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID invalid.' });
+
+    const rezultat = await Rezervare.decide(id, { stareNoua: 'aprobată' });
+    return trimiteDecizia(res, id, rezultat, 'Cererea a fost aprobată.');
+}
+
+// PUT /api/rezervari/:id/respinge  (admin) - KAN-25
+// body: { "motiv": "..." }  - motivul este obligatoriu și apare utilizatorului.
+async function respinge(req, res) {
+    const id = parseId(req.params.id);
+    if (!id) return res.status(400).json({ error: 'ID invalid.' });
+
+    const motiv = text(req.body?.motiv ?? req.body?.motiv_respingere);
+    if (!motiv) return res.status(400).json({ error: 'Motivul respingerii este obligatoriu.' });
+    if (motiv.length > 500) return res.status(400).json({ error: 'Motivul poate avea maxim 500 de caractere.' });
+
+    const rezultat = await Rezervare.decide(id, { stareNoua: 'respinsă', motiv });
+    return trimiteDecizia(res, id, rezultat, 'Cererea a fost respinsă.');
+}
+
+module.exports = { getAll, getById, getOcupate, create, remove, aproba, respinge };
