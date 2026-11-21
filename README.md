@@ -141,7 +141,7 @@ Body pentru POST/PUT:
 | GET | `/api/rezervari/ocupate?laborator_id=2&de_la=2026-11-16&pana_la=2026-11-22` | 🔓 | intervalele ocupate ale unui laborator, pentru calendar (KAN-17); `pana_la` implicit = `de_la` + 6 zile |
 | GET | `/api/rezervari` | 🔑 | rezervările proprii; adminul le vede pe toate (opțional `?stare=în așteptare`) |
 | GET | `/api/rezervari/:id` | 🔑 | o rezervare (proprie sau, pentru admin, oricare) |
-| POST | `/api/rezervari` | 🔑 | cerere nouă, creată cu starea `în așteptare` |
+| POST | `/api/rezervari` | 🔑 student / profesor | cerere nouă, creată cu starea `în așteptare` |
 | DELETE | `/api/rezervari/:id` | 🔑 | anularea unei rezervări proprii (nu și a celor din trecut) |
 | PUT | `/api/rezervari/:id/aproba` | 🔒 admin | aprobarea unei cereri în așteptare |
 | PUT | `/api/rezervari/:id/respinge` | 🔒 admin | respingerea cu motiv; body: `{ "motiv": "..." }` (obligatoriu) |
