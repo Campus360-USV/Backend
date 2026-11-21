@@ -26,6 +26,12 @@ function esteDataValida(valoare) {
     const d = new Date(Date.UTC(an, luna - 1, zi));
     return d.getUTCFullYear() === an && d.getUTCMonth() === luna - 1 && d.getUTCDate() === zi;
 }
+// Sâmbăta (6) și duminica (0) laboratoarele sunt închise
+function esteWeekend(data) {
+    const [an, luna, zi] = data.split('-').map(Number);
+    const ziSaptamana = new Date(Date.UTC(an, luna - 1, zi)).getUTCDay();
+    return ziSaptamana === 0 || ziSaptamana === 6;
+}
 
 function adaugaZile(data, zile) {
     const [an, luna, zi] = data.split('-').map(Number);
@@ -60,6 +66,7 @@ async function validateBody(body) {
     if (!laboratorId) return { error: 'Câmpul "laborator_id" este obligatoriu.' };
     if (!esteDataValida(data)) return { error: 'Câmpul "data_rezervare" trebuie să fie o dată validă (AAAA-LL-ZZ).' };
     if (data < azi()) return { error: 'Nu se pot face rezervări pentru o dată din trecut.' };
+    if (esteWeekend(data)) return { error: 'Laboratoarele se pot rezerva doar de luni până vineri.' };
     if (!ORA.test(oraInceput) || !ORA.test(oraSfarsit)) {
         return { error: 'Intervalul orar trebuie să fie de forma "10:00-12:00" (sau ora_inceput și ora_sfarsit).' };
     }
