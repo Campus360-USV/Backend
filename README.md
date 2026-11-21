@@ -74,7 +74,7 @@ src/
 
 ## Endpoint-uri
 
-🔓 = public · 🔓⁺ = public, dar cu token de profesor/admin se văd și echipamentele speciale · 🔒 admin = necesită `Authorization: Bearer <token>` al unui cont cu rol `admin`
+🔓 = public · 🔒 admin = necesită `Authorization: Bearer <token>` al unui cont cu rol `admin`
 
 ### General și autentificare
 
@@ -88,7 +88,7 @@ src/
 | Metodă | Rută | Acces | Descriere |
 |---|---|---|---|
 | GET | `/api/laboratoare` | 🔓 | lista laboratoarelor |
-| GET | `/api/laboratoare/:id` | 🔓⁺ | detaliile laboratorului + lista `echipamente` |
+| GET | `/api/laboratoare/:id` | 🔓 | detaliile laboratorului + lista `echipamente` |
 | POST | `/api/laboratoare` | 🔒 admin | adaugă un laborator |
 | PUT | `/api/laboratoare/:id` | 🔒 admin | modifică un laborator |
 | DELETE | `/api/laboratoare/:id` | 🔒 admin | șterge laboratorul și echipamentele lui |
@@ -111,9 +111,9 @@ Body pentru POST/PUT:
 
 | Metodă | Rută | Acces | Descriere |
 |---|---|---|---|
-| GET | `/api/echipamente` | 🔓⁺ | lista echipamentelor |
-| GET | `/api/echipamente?laborator_id=2` | 🔓⁺ | echipamentele unui laborator |
-| GET | `/api/echipamente/:id` | 🔓⁺ | un echipament |
+| GET | `/api/echipamente` | 🔓 | lista echipamentelor |
+| GET | `/api/echipamente?laborator_id=2` | 🔓 | echipamentele unui laborator |
+| GET | `/api/echipamente/:id` | 🔓 | un echipament |
 | POST | `/api/echipamente` | 🔒 admin | adaugă un echipament |
 | PUT | `/api/echipamente/:id` | 🔒 admin | modifică un echipament |
 | DELETE | `/api/echipamente/:id` | 🔒 admin | șterge un echipament |
@@ -130,7 +130,7 @@ Body pentru POST/PUT:
 }
 ```
 
-`laborator_id` și `nume` sunt obligatorii. `este_special: true` marchează un echipament special. **Echipamentele speciale sunt vizibile doar pentru profesori și admini** (KAN-13): în `GET /api/echipamente`, `GET /api/echipamente/:id` și `GET /api/laboratoare/:id` ele apar doar dacă cererea are token-ul unui cont `profesor` sau `admin`. Pentru vizitatori și studenți, un echipament special răspunde cu 404.
+`laborator_id` și `nume` sunt obligatorii. `este_special: true` marchează un echipament special (care va fi vizibil doar profesorilor, KAN-13).
 
 ### Coduri de răspuns
 

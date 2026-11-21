@@ -43,20 +43,27 @@ const createUsers = `
     )
 `;
 
-// Cererile de rezervare (folosite de KAN-18 și următoarele).
-// laborator_id face legătura cu tabela laboratoare (în loc de numele laboratorului ca text).
+// Cererile de rezervare (KAN-18 și următoarele).
+// laborator_id face legătura cu tabela laboratoare.
+// KAN-17: intervalul e păstrat ca două coloane TIME (ora_inceput, ora_sfarsit),
+// ca să putem verifica în SQL dacă două rezervări se suprapun.
 const createRezervari = `
     CREATE TABLE IF NOT EXISTS rezervari (
         id INT AUTO_INCREMENT PRIMARY KEY,
         id_utilizator INT NOT NULL,
         laborator_id INT NOT NULL,
         data_rezervare DATE NOT NULL,
-        interval_orar VARCHAR(50) NOT NULL,
+        ora_inceput TIME NOT NULL,
+        ora_sfarsit TIME NOT NULL,
         scop TEXT,
+        participanti INT UNSIGNED NOT NULL DEFAULT 1,
+        tip_activitate VARCHAR(50),
         stare ENUM('în așteptare', 'aprobată', 'respinsă') DEFAULT 'în așteptare',
         motiv_respingere TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (id_utilizator) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (laborator_id) REFERENCES laboratoare(id) ON DELETE CASCADE
+        FOREIGN KEY (laborator_id) REFERENCES laboratoare(id) ON DELETE CASCADE,
+        INDEX idx_rezervari_laborator_data (laborator_id, data_rezervare)
     )
 `;
 
@@ -100,11 +107,46 @@ async function migrateOldEchipamente(pool) {
     console.warn('Tabela veche "echipamente" a fost redenumită în "echipamente_vechi".');
 }
 
+// KAN-17: tabela rezervari din varianta anterioară avea intervalul ca text (interval_orar,
+// ex. "10:00-12:00"). Dacă o găsim, o aducem la structura nouă fără să pierdem datele.
+async function migrateRezervari(pool) {
+    const [tabela] = await pool.query("SHOW TABLES LIKE 'rezervari'");
+    if (tabela.length === 0) return;
+
+    const [coloane] = await pool.query('SHOW COLUMNS FROM rezervari');
+    const nume = coloane.map(c => c.Field);
+
+    if (!nume.includes('ora_inceput')) {
+        await pool.query('ALTER TABLE rezervari ADD COLUMN ora_inceput TIME NULL AFTER data_rezervare, ADD COLUMN ora_sfarsit TIME NULL AFTER ora_inceput');
+        if (nume.includes('interval_orar')) {
+            await pool.query(`UPDATE rezervari SET
+                ora_inceput = STR_TO_DATE(TRIM(SUBSTRING_INDEX(interval_orar, '-', 1)), '%H:%i'),
+                ora_sfarsit = STR_TO_DATE(TRIM(SUBSTRING_INDEX(interval_orar, '-', -1)), '%H:%i')`);
+        }
+        await pool.query("UPDATE rezervari SET ora_inceput = COALESCE(ora_inceput, '08:00'), ora_sfarsit = COALESCE(ora_sfarsit, '10:00')");
+        await pool.query('ALTER TABLE rezervari MODIFY ora_inceput TIME NOT NULL, MODIFY ora_sfarsit TIME NOT NULL');
+        console.warn('Tabela "rezervari" a fost actualizată: interval_orar -> ora_inceput / ora_sfarsit.');
+    }
+    if (nume.includes('interval_orar')) {
+        await pool.query('ALTER TABLE rezervari DROP COLUMN interval_orar');
+    }
+    if (!nume.includes('participanti')) {
+        await pool.query('ALTER TABLE rezervari ADD COLUMN participanti INT UNSIGNED NOT NULL DEFAULT 1 AFTER scop');
+    }
+    if (!nume.includes('tip_activitate')) {
+        await pool.query('ALTER TABLE rezervari ADD COLUMN tip_activitate VARCHAR(50) NULL AFTER participanti');
+    }
+    if (!nume.includes('created_at')) {
+        await pool.query('ALTER TABLE rezervari ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
+    }
+}
+
 async function createTables(pool) {
     await migrateOldEchipamente(pool);
     await pool.execute(createLaboratoare);
     await pool.execute(createEchipamente);
     await pool.execute(createUsers);
+    await migrateRezervari(pool);
     await pool.execute(createRezervari);
 }
 
