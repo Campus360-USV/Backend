@@ -14,4 +14,8 @@ router.get('/:id', requireAuth, controller.getById);
 router.post('/', requireAuth, requireRole('student', 'profesor'), controller.create);
 router.delete('/:id', requireAuth, controller.remove);
 
+// Doar admin: decizia asupra cererilor (KAN-24, KAN-25)
+router.put('/:id/aproba', requireAuth, requireRole('admin'), controller.aproba);
+router.put('/:id/respinge', requireAuth, requireRole('admin'), controller.respinge);
+
 module.exports = router;

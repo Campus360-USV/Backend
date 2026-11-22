@@ -124,9 +124,62 @@ async function createFaraSuprapunere({ idUtilizator, laboratorId, data, oraIncep
     }
 }
 
+// KAN-24 / KAN-25: aprobarea sau respingerea unei cereri de către admin.
+// Se poate decide doar asupra unei cereri "în așteptare". La aprobare se verifică din nou
+// să nu existe deja o rezervare APROBATĂ suprapusă (în aceeași tranzacție, cu blocare).
+// Întoarce { ok }, { negasita }, { dejaProcesata: stare } sau { conflict }.
+async function decide(id, { stareNoua, motiv = null }) {
+    const conn = await getPool().getConnection();
+    try {
+        await conn.beginTransaction();
+        const [[rezervare]] = await conn.query(
+            `SELECT id, laborator_id, DATE_FORMAT(data_rezervare, '%Y-%m-%d') AS data_rezervare,
+                    TIME_FORMAT(ora_inceput, '%H:%i') AS ora_inceput, TIME_FORMAT(ora_sfarsit, '%H:%i') AS ora_sfarsit, stare
+             FROM rezervari WHERE id = ? FOR UPDATE`,
+            [id]
+        );
+        if (!rezervare) {
+            await conn.rollback();
+            return { negasita: true };
+        }
+        if (rezervare.stare !== 'în așteptare') {
+            await conn.rollback();
+            return { dejaProcesata: rezervare.stare };
+        }
+
+        if (stareNoua === 'aprobată') {
+            await conn.query('SELECT id FROM laboratoare WHERE id = ? FOR UPDATE', [rezervare.laborator_id]);
+            const conflict = await findSuprapunere(conn, {
+                laboratorId: rezervare.laborator_id,
+                data: rezervare.data_rezervare,
+                oraInceput: rezervare.ora_inceput,
+                oraSfarsit: rezervare.ora_sfarsit,
+                stari: ['aprobată'],
+                exceptId: id
+            });
+            if (conflict) {
+                await conn.rollback();
+                return { conflict };
+            }
+        }
+
+        await conn.query(
+            'UPDATE rezervari SET stare = ?, motiv_respingere = ? WHERE id = ?',
+            [stareNoua, stareNoua === 'respinsă' ? motiv : null, id]
+        );
+        await conn.commit();
+        return { ok: true };
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+}
+
 async function remove(id) {
     const [result] = await getPool().query('DELETE FROM rezervari WHERE id = ?', [id]);
     return result.affectedRows > 0;
 }
 
-module.exports = { STARI_ACTIVE, findAll, findById, findOcupate, findSuprapunere, createFaraSuprapunere, remove };
+module.exports = { STARI_ACTIVE, findAll, findById, findOcupate, findSuprapunere, createFaraSuprapunere, decide, remove };
