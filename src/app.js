@@ -2,6 +2,7 @@ const express = require('express');
 const echipamentRoutes = require('./routes/echipamentRoutes');
 const laboratorRoutes = require('./routes/laboratorRoutes');
 const authRoutes = require('./routes/authRoutes');
+const rezervareRoutes = require('./routes/rezervareRoutes');
 const { notFound, errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -13,6 +14,7 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api', authRoutes); // POST /api/login
 app.use('/api/laboratoare', laboratorRoutes);
 app.use('/api/echipamente', echipamentRoutes);
+app.use('/api/rezervari', rezervareRoutes);
 
 // Trebuie să fie ultimele
 app.use(notFound);
