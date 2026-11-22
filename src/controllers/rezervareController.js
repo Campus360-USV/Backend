@@ -202,6 +202,9 @@ async function respinge(req, res) {
 
     const motiv = text(req.body?.motiv ?? req.body?.motiv_respingere);
     if (!motiv) return res.status(400).json({ error: 'Motivul respingerii este obligatoriu.' });
+        if (motiv.length < 10) {
+        return res.status(400).json({ error: 'Motivul respingerii trebuie să aibă cel puțin 10 caractere, ca utilizatorul să înțeleagă decizia.' });
+    }
     if (motiv.length > 500) return res.status(400).json({ error: 'Motivul poate avea maxim 500 de caractere.' });
 
     const rezultat = await Rezervare.decide(id, { stareNoua: 'respinsă', motiv });
